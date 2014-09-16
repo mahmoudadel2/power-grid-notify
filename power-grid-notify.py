@@ -1,15 +1,16 @@
 #!/usr/bin/env python
 __author__ = 'Mahmoud Adel <mahmoud.adel2@gmail.com>'
-__version__ = 0.1
+__version__ = 0.2
 
 from BeautifulSoup import BeautifulSoup
 from requests import session
 import pynotify
 import gobject
 import subprocess
+import time
 
 baseurl = 'http://loadmeter.egyptera.org/MiniCurrentLoadClock3.aspx'
-browser = 'chromium-browser'
+browser = 'firefox'
 gridstatus = {
     'Images/c1.gif': 'Safe',
     'Images/c2.gif': 'Warning',
@@ -20,7 +21,7 @@ oldstatus = 'Unknown'
 def fetchdata(targetpage):
     try:
         with session() as c:
-            request = c.get(targetpage)
+            request = c.get(targetpage, timeout=5)
             rawtext = request.text
             soup = BeautifulSoup(rawtext)
         global myhtml
@@ -28,6 +29,8 @@ def fetchdata(targetpage):
     except KeyboardInterrupt:
         exit(0)
     except:
+        print '[ %s ] Could not fetch data, sleeping for 5 seconds...' % (int(time.time()))
+        time.sleep(5)
         pass
 
 def desktopnotify(status, header):
@@ -45,14 +48,15 @@ def desktopnotify(status, header):
     notify.show()
     loop.run()
 
-
 def getgridstatus():
     fetchdata(baseurl)
-    for tag in myhtml:
-        statusdata = dict(tag.attrs)
-    status = statusdata['src']
-    return gridstatus[status]
-
+    try:
+        for tag in myhtml:
+            statusdata = dict(tag.attrs)
+        status = statusdata['src']
+        return gridstatus[status]
+    except:
+        pass
 
 def openstatusurl(action, label):
     subprocess.call('%s %s' % (browser, baseurl), shell=True)
@@ -67,21 +71,20 @@ def ignoredaction(notification):
 
 def main():
     global oldstatus
-    while True:
-        currentstatus = getgridstatus()
-        if currentstatus != oldstatus:
-            if currentstatus == 'Safe':
-                oldstatus = currentstatus
-                desktopnotify(currentstatus, 'Power Grid Status now is: <b><span color="green">%s</span></b>' % (currentstatus))
-            elif currentstatus == 'Warning':
-                oldstatus = currentstatus
-                desktopnotify(currentstatus, 'Power Grid Status now is: <b><span color="orange">%s</span></b>' % (currentstatus))
-            elif currentstatus == 'Critical':
-                oldstatus = currentstatus
-                desktopnotify(currentstatus, 'Power Grid Status now is: <b><span color="red">%s</span></b>' % (currentstatus))
+    currentstatus = getgridstatus()
+    if currentstatus != oldstatus:
+        if currentstatus == 'Safe':
+            oldstatus = currentstatus
+            desktopnotify(currentstatus, 'Power Grid Status now is: <b><span color="green">%s</span></b>' % (currentstatus))
+        elif currentstatus == 'Warning':
+            oldstatus = currentstatus
+            desktopnotify(currentstatus, 'Power Grid Status now is: <b><span color="orange">%s</span></b>' % (currentstatus))
+        elif currentstatus == 'Critical':
+            oldstatus = currentstatus
+            desktopnotify(currentstatus, 'Power Grid Status now is: <b><span color="red">%s</span></b>' % (currentstatus))
 
 if __name__ == '__main__':
     try:
-        main()
+        while True: main()
     except KeyboardInterrupt:
         exit(0)
